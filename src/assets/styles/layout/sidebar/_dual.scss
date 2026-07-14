@@ -1,0 +1,101 @@
+/* 双列侧栏：第一列折叠一级菜单图标 + 第二列展开子菜单；覆盖 sidebar-container 宽度与 main-container 左边距。 */
+
+@use '../../tokens/sass-vars' as *;
+
+// 双列总宽度 = 折叠列(58px) + 间距(8px) + 展开列(200px)
+$dual-sidebar-width: 58px + 8px + $base-sidebar-width;
+// 仅第一列宽度
+$dual-first-width: 58px;
+
+#app {
+  // 双列模式：始终覆盖 sidebar-shell 的 padding，防止全局 .hideSidebar 样式干扰
+  .dualSidebar .sidebar-container .sidebar-shell {
+    padding: 0 !important;
+  }
+
+  // 双列展开状态：两列都显示
+  .dualSidebar:not(.hideSidebar) {
+    .sidebar-container {
+      width: $dual-sidebar-width !important;
+    }
+
+    .main-container {
+      margin-left: calc(#{$dual-sidebar-width} + 12px) !important;
+    }
+
+    // 固定头部宽度适配双列侧栏
+    .fixed-header {
+      width: calc(100% - #{$dual-sidebar-width} - 12px) !important;
+    }
+  }
+
+  // 双列展开状态但第二列无子菜单：仅显示第一列宽度
+  .dualSidebar:not(.hideSidebar) .sidebar-container.dual-no-second {
+    width: $dual-first-width !important;
+
+    // 隐藏第二列
+    .dual-sidebar-second {
+      display: none !important;
+    }
+
+    // 第一列无右边框
+    .dual-sidebar-first {
+      border-right: none;
+    }
+  }
+
+  // 第二列隐藏时，main-container 左边距收窄
+  .dualSidebar:not(.hideSidebar) .sidebar-container.dual-no-second ~ .main-container {
+    margin-left: calc(#{$dual-first-width} + 12px) !important;
+  }
+
+  // 第二列隐藏时，fixed-header 宽度调整
+  .dualSidebar:not(.hideSidebar) .sidebar-container.dual-no-second ~ .main-container .fixed-header {
+    width: calc(100% - #{$dual-first-width} - 12px) !important;
+  }
+
+  // 双列折叠状态（汉堡按钮折叠）：仅显示第一列（图标列）
+  .dualSidebar.hideSidebar:not(.mobile) {
+    .sidebar-container {
+      width: $dual-first-width !important;
+    }
+
+    .main-container {
+      margin-left: 70px !important;
+    }
+
+    .fixed-header {
+      width: calc(100% - 70px) !important;
+    }
+
+    // 隐藏第二列
+    .dual-sidebar-second {
+      display: none !important;
+    }
+
+    // 折叠时第一列无右边框
+    .dual-sidebar-first {
+      border-right: none;
+    }
+
+    // 折叠时隐藏 Logo 文字，仅显示图标
+    .dual-sidebar-logo {
+      .sidebar-title {
+        display: none !important;
+      }
+    }
+  }
+
+  // 移动端双列模式
+  .mobile.dualSidebar {
+    .sidebar-container {
+      width: $dual-sidebar-width !important;
+    }
+
+    &.hideSidebar .sidebar-container {
+      transition: transform 0.28s;
+      pointer-events: none;
+      transform: translate3d(calc(-#{$dual-sidebar-width} - 12px), 0, 0);
+    }
+  }
+}
