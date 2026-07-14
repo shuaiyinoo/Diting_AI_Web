@@ -20,12 +20,12 @@ $dual-first-width: 58px;
     }
 
     .main-container {
-      margin-left: calc(#{$dual-sidebar-width} + 12px) !important;
+      margin-left: calc(#{$dual-sidebar-width}) !important;
     }
 
     // 固定头部宽度适配双列侧栏
     .fixed-header {
-      width: calc(100% - #{$dual-sidebar-width} - 12px) !important;
+      width: calc(100% - #{$dual-sidebar-width}) !important;
     }
   }
 
@@ -46,12 +46,12 @@ $dual-first-width: 58px;
 
   // 第二列隐藏时，main-container 左边距收窄
   .dualSidebar:not(.hideSidebar) .sidebar-container.dual-no-second ~ .main-container {
-    margin-left: calc(#{$dual-first-width} + 12px) !important;
+    margin-left: calc(#{$dual-first-width}) !important;
   }
 
   // 第二列隐藏时，fixed-header 宽度调整
   .dualSidebar:not(.hideSidebar) .sidebar-container.dual-no-second ~ .main-container .fixed-header {
-    width: calc(100% - #{$dual-first-width} - 12px) !important;
+    width: calc(100% - #{$dual-first-width}) !important;
   }
 
   // 双列折叠状态（汉堡按钮折叠）：仅显示第一列（图标列）
@@ -95,7 +95,7 @@ $dual-first-width: 58px;
     &.hideSidebar .sidebar-container {
       transition: transform 0.28s;
       pointer-events: none;
-      transform: translate3d(calc(-#{$dual-sidebar-width} - 12px), 0, 0);
+      transform: translate3d(calc(-#{$dual-sidebar-width}), 0, 0);
     }
   }
 }

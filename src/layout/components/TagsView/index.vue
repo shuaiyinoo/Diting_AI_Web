@@ -483,9 +483,9 @@ onBeforeUnmount(() => {
   height: 38px;
   width: 100%;
   background-color: var(--app-surface-bg);
-  border: 1px solid var(--app-surface-border);
-  border-radius: var(--app-radius-md);
-  box-shadow: var(--app-shadow-sm);
+  //border: 1px solid var(--app-surface-border);
+  //border-radius: var(--app-radius-md);
+  //box-shadow: var(--app-shadow-sm);
 
   $btn-width: 26px;
   $btn-hover-bg: var(--el-fill-color-light);

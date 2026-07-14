@@ -21,7 +21,7 @@ const setting: DefaultSettings = {
   /**
    * 默认布局
    */
-  navType: NavTypeEnum.LEFT,
+  navType: NavTypeEnum.DUAL,
 
   /**
    * 是否显示 tagsView
@@ -31,12 +31,12 @@ const setting: DefaultSettings = {
   /**
    * 持久化标签页
    */
-  tagsViewPersist: false,
+  tagsViewPersist: true,
 
   /**
    * 显示页签图标
    */
-  tagsIcon: true,
+  tagsIcon: false,
 
   /**
    * 是否固定头部
@@ -81,7 +81,7 @@ const setting: DefaultSettings = {
   /**
    * 页面圆角大小
    */
-  radiusBase: 14,
+  radiusBase: 0,
 
   /**
    * 表格全高内部滚动

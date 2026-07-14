@@ -189,7 +189,7 @@ const menuStyle = computed(() => ({
   flex-direction: column;
   gap: 0;
   padding: 0 !important;
-  border: 1px solid var(--app-sidebar-border);
+  //border: 1px solid var(--app-sidebar-border);
   border-radius: var(--app-radius-base);
   box-shadow: var(--app-shadow-sm);
   background: v-bind(bgColor) !important;

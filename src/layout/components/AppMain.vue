@@ -53,7 +53,7 @@ function addIframe() {
   width: 100%;
   position: relative;
   overflow: hidden;
-  padding: 12px;
+  padding: 6px;
 
   &:fullscreen,
   &:-webkit-full-screen,
@@ -74,12 +74,12 @@ function addIframe() {
 
 .app-main.with-fixed-header {
   padding-top: 76px;
-  min-height: calc(100vh - 76px);
+  min-height: 100vh;
 }
 
 .app-main.with-fixed-header.with-tags-view {
-  min-height: calc(100vh - 111px);
-  padding-top: 111px;
+  min-height: 100vh;
+  padding-top: 100px;
 }
 </style>
 <style lang="scss">

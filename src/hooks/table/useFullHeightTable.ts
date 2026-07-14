@@ -116,7 +116,7 @@ const calculateTableHeight = (table: HTMLElement) => {
   const viewportBottom = window.innerHeight;
   const followingHeight = getFollowingHeight(table);
   const bottomPadding = getBottomPadding(table);
-  const bottomOffset = window.innerWidth < 768 ? 28 : 32;
+  const bottomOffset = window.innerWidth < 768 ? 28 : 12;
   const minHeight = window.innerWidth < 768 ? 220 : 260;
 
   return Math.max(minHeight, Math.floor(viewportBottom - rect.top - followingHeight - bottomPadding - bottomOffset));

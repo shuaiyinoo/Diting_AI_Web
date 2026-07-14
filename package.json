@@ -1,14 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package",
-  "name": "ruoyi-vue-plus",
+  "name": "diting-ai-web",
   "version": "6.0.0-BETA",
-  "description": "RuoYi-Vue-Plus后台管理系统",
-  "license": "MIT",
-  "author": "LionLi",
-  "repository": {
-    "type": "git",
-    "url": "https://gitee.com/JavaLionLi/plus-ui.git"
-  },
+  "description": "后台管理系统",
   "type": "module",
   "scripts": {
     "build": "vite build --mode production",

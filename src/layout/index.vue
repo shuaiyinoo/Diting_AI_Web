@@ -112,8 +112,8 @@ const setLayout = () => {
   z-index: 9;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 12px 12px 0;
+  //gap: 3px;
+  padding: 0px 0px 0;
   background: transparent;
 }
 
