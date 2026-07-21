@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
+    "@file-viewer/vite-plugin": "^2.2.3",
+    "@file-viewer/vue3-full": "^2.2.3",
     "@highlightjs/vue-plugin": "2.1.2",
     "@iconify/vue": "^5.0.1",
     "@vueuse/core": "14.3.0",

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { fetchDocumentPreview, downloadDocument, type DocumentItem } from '@/api/rag/document'
+import { FileViewer } from '@file-viewer/vue3-full'
+import { downloadDocument, type DocumentItem } from '@/api/rag/document'
 import { extractErrorMessage } from '@/utils/request'
 
 const props = defineProps<{
@@ -15,9 +16,11 @@ const emit = defineEmits<{
 const loading = ref(false)
 const downloading = ref(false)
 const error = ref('')
-const htmlContent = ref('')
-const textContent = ref('')
-const pdfUrl = ref('')
+const fileSource = ref<File | null>(null)
+
+const viewerOptions = computed(() => ({
+  theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+}))
 
 const normalizedFileExt = computed(() => {
   const ext = props.document?.fileExt?.toLowerCase() ?? ''
@@ -42,23 +45,11 @@ watch(
 
     loading.value = true
     error.value = ''
-    htmlContent.value = ''
-    textContent.value = ''
-    revokePdfUrl()
+    fileSource.value = null
 
     try {
-      const ext = normalizedFileExt.value
-
-      if (ext === 'pdf') {
-        const blob = await downloadDocument(doc.documentId, doc.groupId)
-        pdfUrl.value = URL.createObjectURL(blob)
-      } else if (ext === 'md' || ext === 'markdown') {
-        const preview = await fetchDocumentPreview(doc.documentId, doc.groupId)
-        textContent.value = preview.previewText || '(暂无内容)'
-      } else {
-        const preview = await fetchDocumentPreview(doc.documentId, doc.groupId)
-        textContent.value = preview.previewText || '(暂无文本内容)'
-      }
+      const blob = await downloadDocument(doc.documentId, doc.groupId)
+      fileSource.value = new File([blob], doc.fileName, { type: blob.type || undefined })
     } catch (err) {
       error.value = (await extractErrorMessage(err)) || '加载预览失败'
     } finally {
@@ -68,14 +59,8 @@ watch(
 )
 
 function close() {
-  revokePdfUrl()
+  fileSource.value = null
   emit('update:visible', false)
-}
-
-function revokePdfUrl() {
-  if (!pdfUrl.value) return
-  URL.revokeObjectURL(pdfUrl.value)
-  pdfUrl.value = ''
 }
 
 async function downloadCurrentDocument() {
@@ -227,16 +212,12 @@ function formatDateTime(value: string): string {
         <p>{{ error }}</p>
       </div>
 
-      <div v-else-if="pdfUrl" class="preview-pdf">
-        <iframe :src="pdfUrl" class="pdf-frame" frameborder="0"></iframe>
-      </div>
-
-      <div v-else-if="htmlContent" class="preview-markdown-wrapper">
-        <div class="preview-markdown" v-html="htmlContent"></div>
-      </div>
-
-      <div v-else class="preview-text">
-        <pre>{{ textContent }}</pre>
+      <div v-else-if="fileSource" class="preview-viewer">
+        <FileViewer
+          :key="document?.documentId"
+          :file="fileSource"
+          :options="viewerOptions"
+        />
       </div>
     </div>
   </el-dialog>
@@ -375,49 +356,10 @@ function formatDateTime(value: string): string {
   to { transform: rotate(360deg); }
 }
 
-.preview-pdf {
+.preview-viewer {
   width: 100%;
   height: 100%;
   padding: 18px;
-}
-
-.pdf-frame {
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--el-border-color, #dcdfe6);
-  border-radius: 6px;
-  background: #fff;
-}
-
-.preview-text,
-.preview-markdown-wrapper {
-  height: 100%;
-  overflow-y: auto;
-  padding: 34px clamp(22px, 5vw, 64px) 56px;
-}
-
-.preview-text pre,
-.preview-markdown {
-  width: min(760px, 100%);
-  margin: 0 auto;
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.preview-text pre {
-  padding: 26px 30px;
-  color: var(--el-text-color-primary, #303133);
-  font-family: 'JetBrains Mono', 'Consolas', monospace;
-  font-size: 13.5px;
-  line-height: 1.75;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.preview-markdown {
-  padding: 34px clamp(24px, 4vw, 48px) 54px;
 }
 
 @media (max-width: 720px) {
@@ -437,15 +379,6 @@ function formatDateTime(value: string): string {
 
   .reader-body {
     height: 78vh;
-  }
-
-  .preview-text,
-  .preview-markdown-wrapper {
-    padding: 18px 12px 32px;
-  }
-
-  .preview-markdown {
-    padding: 24px 18px 36px;
   }
 }
 </style>
@@ -468,181 +401,5 @@ function formatDateTime(value: string): string {
 
 .document-reader-dialog .el-dialog__body {
   padding: 0;
-}
-
-.preview-markdown-wrapper .preview-markdown {
-  color: var(--el-text-color-primary, #303133);
-  font-size: 15px;
-  line-height: 1.85;
-}
-
-.preview-markdown-wrapper h1,
-.preview-markdown-wrapper h2,
-.preview-markdown-wrapper h3,
-.preview-markdown-wrapper h4,
-.preview-markdown-wrapper h5,
-.preview-markdown-wrapper h6 {
-  color: var(--el-text-color-primary, #303133);
-  line-height: 1.35;
-}
-
-.preview-markdown-wrapper h1:first-child,
-.preview-markdown-wrapper h2:first-child,
-.preview-markdown-wrapper h3:first-child {
-  margin-top: 0;
-}
-
-.preview-markdown-wrapper h1 {
-  margin: 0 0 0.8em;
-  padding-bottom: 0.35em;
-  border-bottom: 1px solid var(--el-border-color, #dcdfe6);
-  font-size: 1.75em;
-  font-weight: 800;
-}
-
-.preview-markdown-wrapper h2 {
-  margin: 1.8em 0 0.7em;
-  padding-bottom: 0.28em;
-  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
-  font-size: 1.42em;
-  font-weight: 760;
-}
-
-.preview-markdown-wrapper h3 {
-  margin: 1.5em 0 0.55em;
-  font-size: 1.18em;
-  font-weight: 720;
-}
-
-.preview-markdown-wrapper h4 {
-  margin: 1.35em 0 0.45em;
-  font-size: 1.06em;
-  font-weight: 680;
-}
-
-.preview-markdown-wrapper h5,
-.preview-markdown-wrapper h6 {
-  margin: 1.1em 0 0.4em;
-  color: var(--el-text-color-secondary, #909399);
-  font-size: 0.96em;
-  font-weight: 650;
-}
-
-.preview-markdown-wrapper p {
-  margin: 0.78em 0;
-}
-
-.preview-markdown-wrapper p:first-child {
-  margin-top: 0;
-}
-
-.preview-markdown-wrapper p:last-child {
-  margin-bottom: 0;
-}
-
-.preview-markdown-wrapper strong {
-  color: var(--el-text-color-primary, #303133);
-  font-weight: 700;
-}
-
-.preview-markdown-wrapper code {
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #eef6ff;
-  color: #1f6fb8;
-  font-family: 'JetBrains Mono', 'Consolas', monospace;
-  font-size: 0.88em;
-  word-break: break-word;
-}
-
-.preview-markdown-wrapper pre {
-  margin: 1.1em 0;
-  overflow-x: auto;
-  border: 1px solid rgba(30, 41, 59, 0.16);
-  border-radius: 6px;
-  background: #182235;
-  padding: 18px;
-}
-
-.preview-markdown-wrapper pre code {
-  padding: 0;
-  background: none;
-  color: #e2e8f0;
-  font-size: 0.86em;
-  line-height: 1.7;
-}
-
-.preview-markdown-wrapper blockquote {
-  margin: 1.1em 0;
-  padding: 12px 16px;
-  border-left: 3px solid var(--el-color-primary, #409eff);
-  border-radius: 0 6px 6px 0;
-  background: rgba(64, 158, 255, 0.06);
-  color: var(--el-text-color-secondary, #909399);
-}
-
-.preview-markdown-wrapper ul,
-.preview-markdown-wrapper ol {
-  margin: 0.75em 0;
-  padding-left: 1.55em;
-}
-
-.preview-markdown-wrapper ul {
-  list-style: disc;
-}
-
-.preview-markdown-wrapper ol {
-  list-style: decimal;
-}
-
-.preview-markdown-wrapper li {
-  margin: 0.32em 0;
-  padding-left: 0.12em;
-}
-
-.preview-markdown-wrapper table {
-  display: block;
-  width: 100%;
-  margin: 1.25em 0;
-  overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.preview-markdown-wrapper th,
-.preview-markdown-wrapper td {
-  border: 1px solid var(--el-border-color, #dcdfe6);
-  padding: 9px 12px;
-  text-align: left;
-}
-
-.preview-markdown-wrapper th {
-  background: var(--el-fill-color-light, #f5f7fa);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.preview-markdown-wrapper a {
-  color: var(--el-color-primary, #409eff);
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.preview-markdown-wrapper a:hover {
-  text-decoration: underline;
-}
-
-.preview-markdown-wrapper img {
-  max-width: 100%;
-  height: auto;
-  margin: 0.9em 0;
-  border: 1px solid var(--el-border-color, #dcdfe6);
-  border-radius: 6px;
-}
-
-.preview-markdown-wrapper hr {
-  margin: 1.6em 0;
-  border: none;
-  border-top: 1px solid var(--el-border-color, #dcdfe6);
 }
 </style>
