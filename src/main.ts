@@ -3,6 +3,7 @@ import { ElDialog } from 'element-plus';
 import { createApp } from 'vue';
 import { install as VxeTablePlugin, VxeUI } from 'vxe-table';
 import 'virtual:uno.css';
+import 'element-plus/dist/index.css';
 import 'element-plus/theme-chalk/dark/css-vars.css';
 import '@/assets/styles/index.scss';
 import 'highlight.js/styles/atom-one-dark.css';

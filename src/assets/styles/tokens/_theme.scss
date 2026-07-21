@@ -64,4 +64,45 @@
   --el-box-shadow-light: var(--app-shadow-sm);
   --el-box-shadow: var(--app-shadow-md);
   --el-bg-color-page: var(--app-shell-bg);
+
+  // ─── 兼容 ArgusRAG 前端移植过来的设计 token ───
+  /* Brand colors */
+  --brand-primary: var(--app-accent-strong);
+  --brand-primary-light: #7AB8F5;
+  --brand-primary-dark: #3A7BC8;
+  --brand-accent: #5CC9C1;
+  --brand-accent-dark: #3DA89F;
+
+  /* Surfaces */
+  --surface-white: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-muted: #f1f5f9;
+  --surface-accent: #edf5fd;
+  --surface-footer: #1e293b;
+
+  /* Text */
+  --text-primary: var(--app-text-title);
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-on-dark: #e2e8f0;
+  --text-on-dark-muted: #94a3b8;
+
+  /* Borders */
+  --border-default: #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --border-on-dark: rgba(255, 255, 255, 0.08);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.1);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: var(--app-radius-sm);
+  --radius-md: var(--app-radius-md);
+  --radius-lg: var(--app-radius-lg);
+  --radius-xl: 24px;
 }

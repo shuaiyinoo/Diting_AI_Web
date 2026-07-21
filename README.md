@@ -14,5 +14,5 @@ pnpm dev
 # 构建生产环境
 pnpm build:prod
 
-# 前端访问地址 http://localhost:80
+# 前端访问地址 http://localhost:9528
 ```
