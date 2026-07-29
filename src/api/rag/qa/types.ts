@@ -6,6 +6,10 @@ export interface CitationItem {
   fileName: string;
   score: number;
   snippet: string | null;
+  /** 检索来源：VECTOR / KEYWORD / GRAPH / BOTH */
+  retrievalSource?: string | null;
+  /** 图谱检索命中时关联的实体名列表 */
+  graphEntities?: string[] | null;
 }
 
 /** 证据片段 */
@@ -18,6 +22,8 @@ export interface EvidenceSnippet {
   score: number;
   retrievalSource: string;
   snippet: string | null;
+  /** 图谱检索命中时关联的实体名列表 */
+  graphEntities?: string[] | null;
 }
 
 /** 文档证据分组 */

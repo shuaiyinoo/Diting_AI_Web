@@ -1,9 +1,28 @@
 <script setup lang="ts">
-import type { EvidenceOverview } from '@/api/rag/qa'
+import { ref } from 'vue'
+import type { EvidenceOverview, EvidenceSnippet } from '@/api/rag/qa'
+import RetrievalSourceTag from '@/views/rag/components/RetrievalSourceTag.vue'
+import GraphTraceDialog from '@/views/rag/graph/components/GraphTraceDialog.vue'
 
 defineProps<{
   overview: EvidenceOverview
+  groupId?: number | null
 }>()
+
+// ── 图谱溯源弹窗 ──
+const traceVisible = ref(false)
+const traceEntities = ref<string[]>([])
+
+function isGraphSource(source: string | null | undefined): boolean {
+  const value = (source ?? '').toUpperCase()
+  return value === 'GRAPH' || value === 'BOTH'
+}
+
+function openTrace(snippet: EvidenceSnippet) {
+  if (!snippet.graphEntities || snippet.graphEntities.length === 0) return
+  traceEntities.value = snippet.graphEntities
+  traceVisible.value = true
+}
 
 function formatScore(score: number): string {
   if (!Number.isFinite(score)) return '--'
@@ -52,7 +71,13 @@ function chunkRange(start: number | null, end: number | null, fallback: number |
           <span class="evidence-overview__file" :title="group.fileName">{{ group.fileName }}</span>
           <span class="evidence-overview__meta">{{ group.evidenceCount }} 条</span>
           <span class="evidence-overview__meta">{{ formatScore(group.topScore) }}</span>
-          <span class="evidence-overview__sources">{{ group.retrievalSources.join(' / ') }}</span>
+          <span class="evidence-overview__sources">
+            <RetrievalSourceTag
+              v-for="source in group.retrievalSources"
+              :key="source"
+              :source="source"
+            />
+          </span>
         </summary>
 
         <ol class="evidence-overview__snippets">
@@ -63,14 +88,34 @@ function chunkRange(start: number | null, end: number | null, fallback: number |
           >
             <div class="evidence-overview__snippet-head">
               <code>{{ chunkRange(snippet.startChunkIndex, snippet.endChunkIndex, snippet.chunkIndex) }}</code>
-              <span>{{ snippet.retrievalSource }}</span>
+              <RetrievalSourceTag :source="snippet.retrievalSource" />
               <span>{{ formatScore(snippet.score) }}</span>
             </div>
             <p>{{ snippet.snippet || '未提供证据摘要' }}</p>
+            <div
+              v-if="isGraphSource(snippet.retrievalSource) && snippet.graphEntities && snippet.graphEntities.length > 0"
+              class="evidence-overview__entities"
+            >
+              <span class="evidence-overview__entities-label">图谱实体</span>
+              <button
+                v-for="entity in snippet.graphEntities.slice(0, 6)"
+                :key="entity"
+                class="evidence-overview__entity-chip"
+                title="点击进行图谱溯源"
+                @click="openTrace(snippet)"
+              >
+                {{ entity }}
+              </button>
+              <span v-if="snippet.graphEntities.length > 6" class="evidence-overview__entities-more">
+                +{{ snippet.graphEntities.length - 6 }}
+              </span>
+            </div>
           </li>
         </ol>
       </details>
     </div>
+
+    <GraphTraceDialog v-model="traceVisible" :group-id="groupId ?? null" :entities="traceEntities" />
   </section>
 </template>
 
@@ -182,8 +227,13 @@ function chunkRange(start: number | null, end: number | null, fallback: number |
 }
 
 .evidence-overview__sources {
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--brand-primary-dark);
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .evidence-overview__snippets {
@@ -220,6 +270,43 @@ function chunkRange(start: number | null, end: number | null, fallback: number |
   font-size: 0.78rem;
   line-height: 1.55;
   color: var(--text-secondary);
+}
+
+.evidence-overview__entities {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(139, 92, 246, 0.18);
+}
+
+.evidence-overview__entities-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.evidence-overview__entity-chip {
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.08);
+  color: #7c3aed;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.evidence-overview__entity-chip:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.evidence-overview__entities-more {
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }
 
 @media (max-width: 720px) {

@@ -8,6 +8,7 @@ import EvidenceOverviewPanel from './EvidenceOverviewPanel.vue'
 
 const props = defineProps<{
   message: QaMessage
+  groupId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -112,6 +113,7 @@ function formatTime(ts: number): string {
       <EvidenceOverviewPanel
         v-if="message.role === 'assistant' && message.evidenceOverview"
         :overview="message.evidenceOverview"
+        :group-id="groupId ?? null"
       />
 
       <!-- Citations -->

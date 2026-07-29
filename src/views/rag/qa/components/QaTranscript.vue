@@ -8,6 +8,7 @@ const props = defineProps<{
   messages: QaMessageType[]
   sessionId: string
   groupName: string
+  groupId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -76,6 +77,7 @@ watch(
           v-for="msg in messages"
           :key="msg.id"
           :message="msg"
+          :group-id="groupId ?? null"
           @inspect-citation="(c) => emit('inspect-citation', c)"
         />
       </div>

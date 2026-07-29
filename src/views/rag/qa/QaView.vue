@@ -427,6 +427,7 @@ onMounted(() => {
           :messages="activeSession.messages"
           :session-id="activeSession.id"
           :group-name="activeSession.groupName"
+          :group-id="activeSession.groupId ?? selectedGroupId"
           @inspect-citation="openCitation"
         />
       </template>

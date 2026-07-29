@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AssistantCitationItem } from '@/api/rag/assistant/types'
+import RetrievalSourceTag from '@/views/rag/components/RetrievalSourceTag.vue'
 
 defineProps<{
   citations: AssistantCitationItem[]
@@ -58,6 +59,7 @@ function tagClass(fileName: string): string {
         <span class="citebar__chip-no">{{ String(idx + 1).padStart(2, '0') }}</span>
         <span class="citebar__chip-tag" :class="tagClass(c.fileName)">{{ fileTag(c.fileName) }}</span>
         <span class="citebar__chip-name" :title="c.fileName">{{ c.fileName }}</span>
+        <RetrievalSourceTag v-if="c.retrievalSource" :source="c.retrievalSource" />
         <span class="citebar__chip-score">{{ formatScore(c.score) }}</span>
         <svg class="citebar__chip-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
           <line x1="7" y1="17" x2="17" y2="7" />

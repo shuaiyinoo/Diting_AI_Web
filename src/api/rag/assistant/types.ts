@@ -12,6 +12,10 @@ export interface AssistantCitationItem {
   fileName: string;
   score: number;
   snippet: string | null;
+  /** 检索来源：VECTOR / KEYWORD / GRAPH / BOTH */
+  retrievalSource?: string | null;
+  /** 图谱检索命中时关联的实体名列表 */
+  graphEntities?: string[] | null;
 }
 
 /** 会话列表项 */

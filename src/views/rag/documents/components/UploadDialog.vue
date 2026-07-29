@@ -22,7 +22,18 @@ const success = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const dragging = ref(false)
 
-const allowedExts = ['.txt', '.md', '.pdf', '.docx']
+const allowedExts = [
+  // 纯文本
+  '.txt', '.md', '.csv', '.log', '.json', '.xml', '.html', '.htm',
+  // Office
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  // 开放文档
+  '.odt', '.ods', '.odp',
+  // 电子书 / 富文本
+  '.rtf', '.epub',
+  // PDF
+  '.pdf',
+]
 const MAX_FILE_SIZE = 256 * 1024 * 1024
 const CHUNKED_THRESHOLD = 10 * 1024 * 1024
 
@@ -217,7 +228,7 @@ function formatSize(bytes: number): string {
             <strong>点击选择文件</strong>
             <span>或将文件拖拽到此处</span>
           </p>
-          <p class="upload-dialog__zone-hint">支持 TXT · MD · PDF · DOCX，最大 256 MB</p>
+          <p class="upload-dialog__zone-hint">支持 TXT · MD · CSV · LOG · JSON · XML · HTML · DOC(X) · XLS(X) · PPT(X) · ODT/ODS/ODP · RTF · EPUB · PDF，最大 256 MB</p>
         </template>
         <template v-else>
           <div class="upload-dialog__file-icon">
@@ -241,7 +252,7 @@ function formatSize(bytes: number): string {
       <input
         ref="fileInputRef"
         type="file"
-        accept=".txt,.md,.pdf,.docx"
+        accept=".txt,.md,.csv,.log,.json,.xml,.html,.htm,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.rtf,.epub,.pdf"
         class="upload-dialog__file-input"
         @change="onFilePicked"
       />

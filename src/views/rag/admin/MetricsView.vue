@@ -9,6 +9,56 @@ import {
   type UsageRankItem,
 } from '@/api/rag/metrics'
 import { extractErrorMessage } from '@/utils/request'
+import PageHeaderHero from '@/components/layout/PageHeaderHero.vue'
+
+// ── 开发环境示例数据 ──
+// 仅当后端 /rag/admin/metrics/* 接口尚未就绪、且处于 dev 环境时用于让页面可见。
+// 生产环境始终走真实接口；后端接口返回有效数据后此兜底自动不触发。
+const USE_MOCK = import.meta.env.DEV
+
+const mockOverview: MetricsOverview = {
+  todayRequests: 1284,
+  todayTokens: 2350000,
+  todayCost: 18.3421,
+  todaySuccessRate: 98.6,
+  dailyTrend: Array.from({ length: 30 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (29 - i))
+    const base = 600 + Math.round(Math.random() * 1400)
+    return {
+      date: `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`,
+      requests: base,
+      tokens: Math.round(base * (800 + Math.random() * 1200)),
+      cost: Math.round((base * 0.015 + Math.random() * 4) * 10000) / 10000,
+    }
+  }),
+}
+
+const mockUserRank: UsageRankItem[] = [
+  { id: 1, name: '张伟', totalRequests: 4820, totalTokens: 9120000, totalCost: 72.18 },
+  { id: 2, name: '李娜', totalRequests: 3950, totalTokens: 7240000, totalCost: 58.42 },
+  { id: 3, name: '王芳', totalRequests: 3110, totalTokens: 5980000, totalCost: 47.93 },
+  { id: 4, name: '刘洋', totalRequests: 2670, totalTokens: 4890000, totalCost: 39.21 },
+  { id: 5, name: '陈静', totalRequests: 2240, totalTokens: 4120000, totalCost: 33.05 },
+  { id: 6, name: '杨帆', totalRequests: 1980, totalTokens: 3650000, totalCost: 29.28 },
+  { id: 7, name: '赵磊', totalRequests: 1650, totalTokens: 2980000, totalCost: 23.91 },
+  { id: 8, name: '黄敏', totalRequests: 1420, totalTokens: 2560000, totalCost: 20.54 },
+  { id: 9, name: '周强', totalRequests: 1180, totalTokens: 2130000, totalCost: 17.08 },
+  { id: 10, name: '吴婷', totalRequests: 960, totalTokens: 1780000, totalCost: 14.27 },
+]
+
+const mockGroupRank: UsageRankItem[] = [
+  { id: 1, name: '研发组', totalRequests: 15600, totalTokens: 29800000, totalCost: 239.1 },
+  { id: 2, name: '产品组', totalRequests: 12400, totalTokens: 23500000, totalCost: 188.4 },
+  { id: 3, name: '运营组', totalRequests: 9800, totalTokens: 18600000, totalCost: 149.1 },
+  { id: 4, name: '市场组', totalRequests: 7600, totalTokens: 14200000, totalCost: 113.8 },
+  { id: 5, name: '客服组', totalRequests: 5900, totalTokens: 10900000, totalCost: 87.4 },
+  { id: 6, name: '设计组', totalRequests: 4700, totalTokens: 8600000, totalCost: 68.9 },
+  { id: 7, name: '测试组', totalRequests: 3800, totalTokens: 6900000, totalCost: 55.3 },
+  { id: 8, name: '算法组', totalRequests: 3100, totalTokens: 5800000, totalCost: 46.5 },
+  { id: 9, name: '数据组', totalRequests: 2500, totalTokens: 4700000, totalCost: 37.7 },
+  { id: 10, name: '行政组', totalRequests: 1900, totalTokens: 3500000, totalCost: 28.1 },
+]
 
 // ── 时间段选项 ──
 const periodOptions: { label: string; value: Period }[] = [
@@ -145,8 +195,13 @@ async function loadOverview() {
   errorMsg.value = ''
   try {
     overview.value = await fetchMetricsOverview()
+    if (!overview.value && USE_MOCK) overview.value = mockOverview
   } catch (err) {
-    errorMsg.value = '加载概览数据失败'
+    if (USE_MOCK) {
+      overview.value = mockOverview
+    } else {
+      errorMsg.value = '加载概览数据失败'
+    }
   } finally {
     loadingOverview.value = false
   }
@@ -159,10 +214,15 @@ async function loadRanks() {
       fetchUserRank(selectedPeriod.value, 10),
       fetchGroupRank(selectedPeriod.value, 10),
     ])
-    userRank.value = users
-    groupRank.value = groups
+    userRank.value = users?.length ? users : USE_MOCK ? mockUserRank : []
+    groupRank.value = groups?.length ? groups : USE_MOCK ? mockGroupRank : []
   } catch (err) {
-    errorMsg.value = '加载排行数据失败'
+    if (USE_MOCK) {
+      userRank.value = mockUserRank
+      groupRank.value = mockGroupRank
+    } else {
+      errorMsg.value = '加载排行数据失败'
+    }
   } finally {
     loadingRank.value = false
   }
@@ -172,6 +232,10 @@ watch(selectedPeriod, () => {
   loadRanks()
 })
 
+async function refreshAll() {
+  await Promise.all([loadOverview(), loadRanks()])
+}
+
 onMounted(() => {
   loadOverview()
   loadRanks()
@@ -180,11 +244,20 @@ onMounted(() => {
 
 <template>
   <div class="metrics-page">
-    <!-- 页头 -->
-    <div class="page-header">
-      <h1>使用统计</h1>
-      <p>LLM 调用量、Token 消耗与费用分析</p>
-    </div>
+    <PageHeaderHero
+      eyebrow="数据分析"
+      title="用量统计"
+      description="LLM 调用量、Token 消耗与费用分析"
+    >
+      <template #actions>
+        <button class="action-btn" @click="refreshAll">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          刷新
+        </button>
+      </template>
+    </PageHeaderHero>
 
     <!-- 错误提示 -->
     <div v-if="errorMsg" class="error-banner">
@@ -450,21 +523,25 @@ onMounted(() => {
   box-shadow: var(--shadow-sm);
 }
 
-/* ── 页头 ── */
-.page-header {
-  margin-bottom: 32px;
-}
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  margin-bottom: 4px;
-}
-.page-header p {
-  font-size: 14px;
+/* ── 刷新按钮（页头操作） ── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  font-weight: 600;
+  border: 1px solid var(--border-default);
+  background: var(--surface-white);
   color: var(--text-secondary);
-  margin: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.action-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+  background: var(--surface-subtle);
 }
 
 /* ── 错误提示 ── */
