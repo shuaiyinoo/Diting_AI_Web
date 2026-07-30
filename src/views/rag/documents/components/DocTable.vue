@@ -48,6 +48,37 @@ function statusLabel(status: string): string {
   return map[status] ?? status
 }
 
+function tripleStatusLabel(status: string | null): string {
+  if (!status || status === 'NONE') return '未抽取'
+  const map: Record<string, string> = {
+    PENDING: '等待中',
+    EXTRACTING: '抽取中',
+    SUCCESS: '完成',
+    PARTIAL: '部分失败',
+    FAILED: '失败',
+  }
+  return map[status] ?? status
+}
+
+function tripleStatusClass(status: string | null): string {
+  const s = (status ?? 'NONE').toLowerCase()
+  return `doc-table__triple doc-table__triple--${s}`
+}
+
+function tripleProgressText(doc: DocumentItem): string {
+  if (!doc.tripleStatus || doc.tripleStatus === 'NONE') return '--'
+  const total = doc.tripleTotalChunks ?? 0
+  const success = doc.tripleSuccessCount ?? 0
+  const failed = doc.tripleFailedCount ?? 0
+  if (doc.tripleStatus === 'SUCCESS') {
+    return `${success}/${total}`
+  }
+  if (doc.tripleStatus === 'FAILED' || doc.tripleStatus === 'PARTIAL') {
+    return `${success}/${total} (失败${failed})`
+  }
+  return `${success}/${total}`
+}
+
 function uploaderName(doc: DocumentItem): string {
   return doc.uploaderDisplayName ?? doc.uploaderUserCode ?? '未知用户'
 }
@@ -83,6 +114,7 @@ function uploaderName(doc: DocumentItem): string {
             <th class="doc-table__col-name">文件名</th>
             <th class="doc-table__col-size">大小</th>
             <th class="doc-table__col-status">状态</th>
+            <th class="doc-table__col-triple">三元抽取</th>
             <th class="doc-table__col-uploader">上传者</th>
             <th class="doc-table__col-time">上传时间</th>
             <th class="doc-table__col-actions">操作</th>
@@ -119,6 +151,12 @@ function uploaderName(doc: DocumentItem): string {
                   <path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
                 </svg>
               </span>
+            </td>
+            <td class="doc-table__col-triple">
+              <span :class="tripleStatusClass(doc.tripleStatus)">
+                {{ tripleStatusLabel(doc.tripleStatus) }}
+              </span>
+              <span class="doc-table__triple-progress">{{ tripleProgressText(doc) }}</span>
             </td>
             <td class="doc-table__col-uploader">{{ uploaderName(doc) }}</td>
             <td class="doc-table__col-time">{{ formatTime(doc.uploadedAt) }}</td>
@@ -270,7 +308,7 @@ function uploaderName(doc: DocumentItem): string {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.86rem;
-  min-width: 780px;
+  min-width: 930px;
 }
 
 .doc-table th {
@@ -309,6 +347,7 @@ function uploaderName(doc: DocumentItem): string {
 .doc-table__col-name { min-width: 240px; }
 .doc-table__col-size { width: 80px; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); }
 .doc-table__col-status { width: 130px; }
+.doc-table__col-triple { width: 150px; }
 .doc-table__col-uploader { width: 110px; color: var(--text-secondary); }
 .doc-table__col-time { width: 160px; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: var(--text-secondary); }
 .doc-table__col-actions { width: 200px; }
@@ -407,6 +446,67 @@ function uploaderName(doc: DocumentItem): string {
   color: #dc2626;
   cursor: help;
   vertical-align: middle;
+}
+
+/* Triple extraction status pills */
+.doc-table__triple {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.doc-table__triple::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.doc-table__triple--none {
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.doc-table__triple--pending {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.doc-table__triple--extracting {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.12);
+  animation: status-pulse 1.8s ease-in-out infinite;
+}
+
+.doc-table__triple--success {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.doc-table__triple--partial {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.doc-table__triple--failed {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.doc-table__triple-progress {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* Action buttons */

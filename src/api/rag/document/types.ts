@@ -27,6 +27,26 @@ export interface DocumentItem {
   uploaderDisplayName: string | null;
   uploaderUserCode: string | null;
   previewText: string | null;
+  /** 三元组抽取状态摘要：NONE | PENDING | EXTRACTING | SUCCESS | PARTIAL | FAILED */
+  tripleStatus: string | null;
+  /** 三元组抽取总块数 */
+  tripleTotalChunks: number | null;
+  /** 三元组抽取成功数 */
+  tripleSuccessCount: number | null;
+  /** 三元组抽取失败数 */
+  tripleFailedCount: number | null;
+}
+
+/** 三元组抽取进度 */
+export interface TripleExtractionProgress {
+  documentId: number;
+  totalChunks: number;
+  successCount: number;
+  failedCount: number;
+  extractingCount: number;
+  pendingCount: number;
+  /** 整体状态：NONE | PENDING | EXTRACTING | SUCCESS | PARTIAL | FAILED */
+  overallStatus: string;
 }
 
 /** 文档预览信息 */

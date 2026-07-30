@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageHeaderHero from '@/components/layout/PageHeaderHero.vue'
@@ -155,18 +155,28 @@ function handleExport() {
   canvasRef.value?.exportImage(`knowledge-graph-${Date.now()}.png`)
 }
 
-watch(selectedGroupId, (newId) => {
-  appStore.setCurrentGroupId(newId)
-  if (newId !== null) loadOverview()
-})
+/** 用户通过下拉框切换群组时触发 */
+function handleGroupChange() {
+  appStore.setCurrentGroupId(selectedGroupId.value)
+  if (selectedGroupId.value !== null) {
+    loadOverview()
+  }
+}
 
 onMounted(async () => {
+  // 1. 确保群组已加载
   if (appStore.visibleGroups.length === 0) {
     await loadGroups()
-  } else if (selectedGroupId.value === null) {
-    selectedGroupId.value = appStore.visibleGroups[0]?.groupId ?? null
   }
-  // 支持从溯源弹窗携带 ?entity= 跳转
+  // 2. 确保有选中的群组（loadGroups 内部可能已设置，此处兜底）
+  if (
+    selectedGroupId.value === null ||
+    !appStore.visibleGroups.some((g) => g.groupId === selectedGroupId.value)
+  ) {
+    selectedGroupId.value = appStore.currentGroupId ?? appStore.visibleGroups[0]?.groupId ?? null
+  }
+
+  // 3. 加载数据（支持从溯源弹窗携带 ?entity= 跳转）
   const entity = typeof route.query.entity === 'string' ? route.query.entity : ''
   if (entity && selectedGroupId.value !== null) {
     searchText.value = entity
@@ -180,7 +190,7 @@ onMounted(async () => {
       graphLoading.value = false
     }
   } else if (selectedGroupId.value !== null) {
-    loadOverview()
+    await loadOverview()
   }
 })
 </script>
@@ -199,6 +209,7 @@ onMounted(async () => {
         :loading="groupsLoading"
         placeholder="选择知识库群组"
         class="graph-explorer__group-select"
+        @change="handleGroupChange"
       >
         <el-option
           v-for="group in appStore.visibleGroups"
@@ -234,30 +245,27 @@ onMounted(async () => {
     </div>
 
     <div class="graph-explorer__stage" v-loading="graphLoading" element-loading-text="正在加载知识图谱…">
-      <template v-if="graph && graph.nodes.length > 0">
-        <div class="graph-explorer__stats">
-          <span class="graph-explorer__stat">
-            <i class="graph-explorer__dot graph-explorer__dot--matched" />命中实体
-          </span>
-          <span class="graph-explorer__stat">
-            <i class="graph-explorer__dot graph-explorer__dot--related" />关联实体
-          </span>
-          <span class="graph-explorer__divider" />
-          <span>{{ nodeCount }} 节点</span>
-          <span>{{ edgeCount }} 关系</span>
-          <span>耗时 {{ durationText }}</span>
-          <span class="graph-explorer__hint">单击节点查看详情 · 双击扩展邻居</span>
-        </div>
-        <GraphCanvas
-          ref="canvasRef"
-          :graph="graph"
-          :layout="layout"
-          @node-click="handleNodeClick"
-          @node-dblclick="handleNodeDblClick"
-        />
-      </template>
-
-      <div v-else-if="!graphLoading" class="graph-explorer__empty">
+      <div v-if="graph && graph.nodes.length > 0" class="graph-explorer__stats">
+        <span class="graph-explorer__stat">
+          <i class="graph-explorer__dot graph-explorer__dot--matched" />命中实体
+        </span>
+        <span class="graph-explorer__stat">
+          <i class="graph-explorer__dot graph-explorer__dot--related" />关联实体
+        </span>
+        <span class="graph-explorer__divider" />
+        <span>{{ nodeCount }} 节点</span>
+        <span>{{ edgeCount }} 关系</span>
+        <span>耗时 {{ durationText }}</span>
+        <span class="graph-explorer__hint">单击节点查看详情 · 双击扩展邻居</span>
+      </div>
+      <GraphCanvas
+        ref="canvasRef"
+        :graph="graph"
+        :layout="layout"
+        @node-click="handleNodeClick"
+        @node-dblclick="handleNodeDblClick"
+      />
+      <div v-if="!graphLoading && (!graph || graph.nodes.length === 0)" class="graph-explorer__empty">
         <el-empty
           :description="selectedGroupId === null ? '请先选择知识库群组' : '当前群组暂无图谱数据，请先上传并处理文档'"
           :image-size="110"
@@ -370,12 +378,14 @@ onMounted(async () => {
 }
 
 .graph-explorer__empty {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 14px;
   background: var(--surface-white);
   border: 1px dashed rgba(15, 23, 42, 0.12);
+  z-index: 1;
 }
 </style>

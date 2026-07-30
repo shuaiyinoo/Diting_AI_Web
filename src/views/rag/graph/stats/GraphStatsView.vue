@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import PageHeaderHero from '@/components/layout/PageHeaderHero.vue'
@@ -200,20 +200,30 @@ function handleResize() {
   topEntityChart?.resize()
 }
 
-watch(selectedGroupId, (newId) => {
-  appStore.setCurrentGroupId(newId)
-  if (newId !== null) loadStatistics()
-})
+/** 用户通过下拉框切换群组时触发 */
+function handleGroupChange() {
+  appStore.setCurrentGroupId(selectedGroupId.value)
+  if (selectedGroupId.value !== null) {
+    loadStatistics()
+  }
+}
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
+  // 1. 确保群组已加载
   if (appStore.visibleGroups.length === 0) {
     await loadGroups()
-  } else if (selectedGroupId.value === null) {
-    selectedGroupId.value = appStore.visibleGroups[0]?.groupId ?? null
   }
+  // 2. 确保有选中的群组
+  if (
+    selectedGroupId.value === null ||
+    !appStore.visibleGroups.some((g) => g.groupId === selectedGroupId.value)
+  ) {
+    selectedGroupId.value = appStore.currentGroupId ?? appStore.visibleGroups[0]?.groupId ?? null
+  }
+  // 3. 加载统计
   if (selectedGroupId.value !== null) {
-    loadStatistics()
+    await loadStatistics()
   }
 })
 
@@ -241,6 +251,7 @@ onBeforeUnmount(() => {
           :loading="groupsLoading"
           placeholder="选择知识库群组"
           class="graph-stats__group-select"
+          @change="handleGroupChange"
         >
           <el-option
             v-for="group in appStore.visibleGroups"

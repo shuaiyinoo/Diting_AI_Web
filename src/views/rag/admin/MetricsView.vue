@@ -1,64 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import * as echarts from 'echarts'
 import {
   fetchMetricsOverview,
+  fetchTrend,
   fetchUserRank,
   fetchGroupRank,
   type Period,
   type MetricsOverview,
+  type TrendItem,
   type UsageRankItem,
 } from '@/api/rag/metrics'
 import { extractErrorMessage } from '@/utils/request'
+import { ElMessage } from 'element-plus'
 import PageHeaderHero from '@/components/layout/PageHeaderHero.vue'
 
-// ── 开发环境示例数据 ──
-// 仅当后端 /rag/admin/metrics/* 接口尚未就绪、且处于 dev 环境时用于让页面可见。
-// 生产环境始终走真实接口；后端接口返回有效数据后此兜底自动不触发。
-const USE_MOCK = import.meta.env.DEV
-
-const mockOverview: MetricsOverview = {
-  todayRequests: 1284,
-  todayTokens: 2350000,
-  todayCost: 18.3421,
-  todaySuccessRate: 98.6,
-  dailyTrend: Array.from({ length: 30 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (29 - i))
-    const base = 600 + Math.round(Math.random() * 1400)
-    return {
-      date: `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, '0')}`,
-      requests: base,
-      tokens: Math.round(base * (800 + Math.random() * 1200)),
-      cost: Math.round((base * 0.015 + Math.random() * 4) * 10000) / 10000,
-    }
-  }),
-}
-
-const mockUserRank: UsageRankItem[] = [
-  { id: 1, name: '张伟', totalRequests: 4820, totalTokens: 9120000, totalCost: 72.18 },
-  { id: 2, name: '李娜', totalRequests: 3950, totalTokens: 7240000, totalCost: 58.42 },
-  { id: 3, name: '王芳', totalRequests: 3110, totalTokens: 5980000, totalCost: 47.93 },
-  { id: 4, name: '刘洋', totalRequests: 2670, totalTokens: 4890000, totalCost: 39.21 },
-  { id: 5, name: '陈静', totalRequests: 2240, totalTokens: 4120000, totalCost: 33.05 },
-  { id: 6, name: '杨帆', totalRequests: 1980, totalTokens: 3650000, totalCost: 29.28 },
-  { id: 7, name: '赵磊', totalRequests: 1650, totalTokens: 2980000, totalCost: 23.91 },
-  { id: 8, name: '黄敏', totalRequests: 1420, totalTokens: 2560000, totalCost: 20.54 },
-  { id: 9, name: '周强', totalRequests: 1180, totalTokens: 2130000, totalCost: 17.08 },
-  { id: 10, name: '吴婷', totalRequests: 960, totalTokens: 1780000, totalCost: 14.27 },
-]
-
-const mockGroupRank: UsageRankItem[] = [
-  { id: 1, name: '研发组', totalRequests: 15600, totalTokens: 29800000, totalCost: 239.1 },
-  { id: 2, name: '产品组', totalRequests: 12400, totalTokens: 23500000, totalCost: 188.4 },
-  { id: 3, name: '运营组', totalRequests: 9800, totalTokens: 18600000, totalCost: 149.1 },
-  { id: 4, name: '市场组', totalRequests: 7600, totalTokens: 14200000, totalCost: 113.8 },
-  { id: 5, name: '客服组', totalRequests: 5900, totalTokens: 10900000, totalCost: 87.4 },
-  { id: 6, name: '设计组', totalRequests: 4700, totalTokens: 8600000, totalCost: 68.9 },
-  { id: 7, name: '测试组', totalRequests: 3800, totalTokens: 6900000, totalCost: 55.3 },
-  { id: 8, name: '算法组', totalRequests: 3100, totalTokens: 5800000, totalCost: 46.5 },
-  { id: 9, name: '数据组', totalRequests: 2500, totalTokens: 4700000, totalCost: 37.7 },
-  { id: 10, name: '行政组', totalRequests: 1900, totalTokens: 3500000, totalCost: 28.1 },
-]
+defineOptions({ name: 'MetricsView' })
 
 // ── 时间段选项 ──
 const periodOptions: { label: string; value: Period }[] = [
@@ -72,24 +29,41 @@ const selectedPeriod = ref<Period>('LAST_7_DAYS')
 
 // ── 数据状态 ──
 const overview = ref<MetricsOverview | null>(null)
+const trendData = ref<TrendItem[]>([])
 const userRank = ref<UsageRankItem[]>([])
 const groupRank = ref<UsageRankItem[]>([])
 
 const loadingOverview = ref(false)
+const loadingTrend = ref(false)
 const loadingRank = ref(false)
 const errorMsg = ref('')
 
+// ── ECharts 实例 ──
+const trendChartRef = ref<HTMLElement | null>(null)
+const userRankChartRef = ref<HTMLElement | null>(null)
+const groupRankChartRef = ref<HTMLElement | null>(null)
+
+let trendChart: echarts.ECharts | null = null
+let userRankChart: echarts.ECharts | null = null
+let groupRankChart: echarts.ECharts | null = null
+
 // ── 格式化工具 ──
-function formatNumber(n: number): string {
-  return n.toLocaleString('zh-CN')
+// 后端 BigDecimal 字段在 JSON 中可能序列化为字符串，需统一转为 number
+function toNum(n: unknown): number {
+  const v = Number(n)
+  return isNaN(v) ? 0 : v
 }
 
-function formatCost(n: number): string {
-  return n.toFixed(4)
+function formatNumber(n: unknown): string {
+  return toNum(n).toLocaleString('zh-CN')
 }
 
-function formatPercent(n: number): string {
-  return n.toFixed(1) + '%'
+function formatCost(n: unknown): string {
+  return toNum(n).toFixed(4)
+}
+
+function formatPercent(n: unknown): string {
+  return toNum(n).toFixed(1) + '%'
 }
 
 function formatDate(dateStr: string): string {
@@ -117,7 +91,7 @@ function getAvatarColor(index: number): string {
 }
 
 function getInitial(name: string): string {
-  return name.charAt(0).toUpperCase()
+  return (name || '?').charAt(0).toUpperCase()
 }
 
 // ── 排行徽章类型 ──
@@ -128,82 +102,239 @@ function getRankBadgeClass(idx: number): string {
   return ''
 }
 
-// ── SVG 趋势图数据 ──
-const CHART_WIDTH = 900
-const CHART_HEIGHT = 220
-const CHART_PAD_LEFT = 8
-const CHART_PAD_RIGHT = 8
+// ── 是否有趋势数据 ──
+const hasTrendData = computed(() => trendData.value.length > 0)
 
-const trendChart = computed(() => {
-  const trend = overview.value?.dailyTrend ?? []
-  if (trend.length === 0) return null
+// ── ECharts 渲染 ──
+function renderTrendChart() {
+  if (!trendChartRef.value) return
+  trendChart ??= echarts.init(trendChartRef.value)
 
-  const innerW = CHART_WIDTH - CHART_PAD_LEFT - CHART_PAD_RIGHT
-  const maxVal = Math.max(
-    ...trend.map((t) => t.requests),
-    ...trend.map((t) => t.tokens),
-    1,
-  )
+  const dates = trendData.value.map((t) => formatDate(t.date))
+  const requests = trendData.value.map((t) => toNum(t.requests))
+  const tokens = trendData.value.map((t) => toNum(t.tokens))
 
-  // 生成折线点
-  const toX = (i: number) => CHART_PAD_LEFT + (i / Math.max(trend.length - 1, 1)) * innerW
-  const toY = (v: number) => CHART_HEIGHT - (v / maxVal) * CHART_HEIGHT
+  trendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderColor: 'rgba(74,144,217,0.2)',
+      textStyle: { color: '#1e293b', fontSize: 12 },
+      axisPointer: { type: 'cross', crossStyle: { color: '#999' } },
+    },
+    legend: {
+      data: ['调用量', 'Token 消耗'],
+      top: 0,
+      right: 0,
+      itemWidth: 12,
+      itemHeight: 12,
+      textStyle: { fontSize: 12, color: '#64748b' },
+    },
+    grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: dates,
+      axisLabel: { color: '#94a3b8', fontSize: 11 },
+      axisLine: { lineStyle: { color: 'rgba(15,23,42,0.12)' } },
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '调用量',
+        nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+        splitLine: { lineStyle: { color: 'rgba(15,23,42,0.06)' } },
+        axisLabel: {
+          color: '#94a3b8',
+          fontSize: 11,
+          formatter: (val: number) => (val >= 10000 ? (val / 1000).toFixed(0) + 'k' : String(val)),
+        },
+      },
+      {
+        type: 'value',
+        name: 'Token',
+        nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+        splitLine: { show: false },
+        axisLabel: {
+          color: '#94a3b8',
+          fontSize: 11,
+          formatter: (val: number) => (val >= 10000 ? (val / 1000).toFixed(0) + 'k' : String(val)),
+        },
+      },
+    ],
+    series: [
+      {
+        name: '调用量',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: false,
+        data: requests,
+        itemStyle: { color: '#3b82f6' },
+        lineStyle: { width: 2.5, color: '#3b82f6' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(59,130,246,0.25)' },
+            { offset: 1, color: 'rgba(59,130,246,0.02)' },
+          ]),
+        },
+        emphasis: { focus: 'series' },
+      },
+      {
+        name: 'Token 消耗',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: false,
+        yAxisIndex: 1,
+        data: tokens,
+        itemStyle: { color: '#14b8a6' },
+        lineStyle: { width: 2.5, color: '#14b8a6' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(20,184,166,0.25)' },
+            { offset: 1, color: 'rgba(20,184,166,0.02)' },
+          ]),
+        },
+        emphasis: { focus: 'series' },
+      },
+    ],
+  })
+}
 
-  const requestPoints = trend.map((t, i) => `${toX(i)},${toY(t.requests)}`).join(' ')
-  const tokenPoints = trend.map((t, i) => `${toX(i)},${toY(t.tokens)}`).join(' ')
+function renderRankChart(
+  chart: echarts.ECharts | null,
+  ref: HTMLElement | null,
+  data: UsageRankItem[],
+  colorFrom: string,
+  colorTo: string,
+) {
+  if (!ref) return
+  chart ??= echarts.init(ref)
 
-  const lastItem = trend[trend.length - 1]
-  if (!lastItem) return null
-  const lastX = toX(trend.length - 1)
+  const sorted = [...data].sort((a, b) => toNum(a.totalTokens) - toNum(b.totalTokens))
+  const names = sorted.map((item) => item.name || '未知')
+  const values = sorted.map((item) => toNum(item.totalTokens))
 
-  // 面积填充路径
-  const requestArea = `M${toX(0)},${CHART_HEIGHT} L${requestPoints} L${lastX},${CHART_HEIGHT} Z`
-  const tokenArea = `M${toX(0)},${CHART_HEIGHT} L${tokenPoints} L${lastX},${CHART_HEIGHT} Z`
+  chart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      borderColor: 'rgba(74,144,217,0.2)',
+      textStyle: { color: '#1e293b', fontSize: 12 },
+      formatter: (params: any) => {
+        const item = params[0]
+        if (!item) return ''
+        const original = sorted[item.dataIndex]
+        if (!original) return ''
+        return `${original.name}<br/>Token: ${formatNumber(original.totalTokens)}<br/>调用: ${formatNumber(original.totalRequests)}<br/>费用: ${formatCost(original.totalCost)}`
+      },
+    },
+    grid: { left: 8, right: 50, top: 8, bottom: 6, containLabel: true },
+    xAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: 'rgba(15,23,42,0.06)' } },
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: 11,
+        formatter: (val: number) => (val >= 10000 ? (val / 1000).toFixed(0) + 'k' : String(val)),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: names,
+      axisLabel: {
+        color: '#475569',
+        fontSize: 11,
+        formatter: (val: string) => (val.length > 8 ? val.slice(0, 8) + '…' : val),
+      },
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: values,
+        barWidth: 14,
+        itemStyle: {
+          borderRadius: [0, 6, 6, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: colorFrom },
+            { offset: 1, color: colorTo },
+          ]),
+        },
+        label: {
+          show: true,
+          position: 'right',
+          color: '#64748b',
+          fontSize: 11,
+          formatter: (params: any) => {
+            const val = params.value as number
+            return val >= 10000 ? (val / 1000).toFixed(1) + 'k' : String(val)
+          },
+        },
+      },
+    ],
+  })
+}
 
-  // Y 轴刻度
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxVal * f))
+function renderUserRankChart() {
+  renderRankChart(userRankChart, userRankChartRef.value, userRank.value, '#3b82f6', '#60a5fa')
+}
 
-  // X 轴标签（稀疏采样）
-  const xLabels: { x: number; label: string }[] = []
-  const maxLabels = 8
-  const step = Math.max(1, Math.floor(trend.length / maxLabels))
-  for (let i = 0; i < trend.length; i += step) {
-    xLabels.push({ x: toX(i), label: formatDate(trend[i]!.date) })
+function renderGroupRankChart() {
+  renderRankChart(groupRankChart, groupRankChartRef.value, groupRank.value, '#8b5cf6', '#c4b5fd')
+}
+
+function renderAllCharts() {
+  if (hasTrendData.value) {
+    nextTick(() => renderTrendChart())
   }
-  // 确保最后一个日期在
-  if (xLabels.length > 0 && xLabels[xLabels.length - 1]!.x < lastX - 20) {
-    xLabels.push({ x: lastX, label: formatDate(lastItem!.date) })
+  if (userRank.value.length > 0) {
+    nextTick(() => renderUserRankChart())
   }
+  if (groupRank.value.length > 0) {
+    nextTick(() => renderGroupRankChart())
+  }
+}
 
-  return {
-    requestPoints,
-    tokenPoints,
-    requestArea,
-    tokenArea,
-    yTicks,
-    xLabels,
-    lastX,
-    lastYRequest: toY(lastItem.requests),
-    lastYToken: toY(lastItem.tokens),
-    gridYs: [0, 0.25, 0.5, 0.75, 1].map((f) => CHART_HEIGHT - f * CHART_HEIGHT),
-  }
-})
+function handleResize() {
+  trendChart?.resize()
+  userRankChart?.resize()
+  groupRankChart?.resize()
+}
 
 // ── 数据加载 ──
 async function loadOverview() {
   loadingOverview.value = true
-  errorMsg.value = ''
   try {
     overview.value = await fetchMetricsOverview()
-    if (!overview.value && USE_MOCK) overview.value = mockOverview
   } catch (err) {
-    if (USE_MOCK) {
-      overview.value = mockOverview
-    } else {
-      errorMsg.value = '加载概览数据失败'
-    }
+    const msg = await extractErrorMessage(err)
+    errorMsg.value = msg || '加载概览数据失败'
   } finally {
     loadingOverview.value = false
+  }
+}
+
+async function loadTrend() {
+  loadingTrend.value = true
+  try {
+    const data = await fetchTrend(selectedPeriod.value)
+    trendData.value = data ?? []
+    if (trendData.value.length > 0) {
+      await nextTick()
+      renderTrendChart()
+    }
+  } catch (err) {
+    const msg = await extractErrorMessage(err)
+    ElMessage.warning(msg || '加载趋势数据失败')
+    trendData.value = []
+  } finally {
+    loadingTrend.value = false
   }
 }
 
@@ -214,31 +345,44 @@ async function loadRanks() {
       fetchUserRank(selectedPeriod.value, 10),
       fetchGroupRank(selectedPeriod.value, 10),
     ])
-    userRank.value = users?.length ? users : USE_MOCK ? mockUserRank : []
-    groupRank.value = groups?.length ? groups : USE_MOCK ? mockGroupRank : []
+    userRank.value = users ?? []
+    groupRank.value = groups ?? []
+    await nextTick()
+    renderUserRankChart()
+    renderGroupRankChart()
   } catch (err) {
-    if (USE_MOCK) {
-      userRank.value = mockUserRank
-      groupRank.value = mockGroupRank
-    } else {
-      errorMsg.value = '加载排行数据失败'
-    }
+    const msg = await extractErrorMessage(err)
+    ElMessage.warning(msg || '加载排行数据失败')
   } finally {
     loadingRank.value = false
   }
 }
 
 watch(selectedPeriod, () => {
+  loadTrend()
   loadRanks()
 })
 
 async function refreshAll() {
-  await Promise.all([loadOverview(), loadRanks()])
+  errorMsg.value = ''
+  await Promise.all([loadOverview(), loadTrend(), loadRanks()])
 }
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize)
   loadOverview()
+  loadTrend()
   loadRanks()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  trendChart?.dispose()
+  userRankChart?.dispose()
+  groupRankChart?.dispose()
+  trendChart = null
+  userRankChart = null
+  groupRankChart = null
 })
 </script>
 
@@ -317,91 +461,28 @@ onMounted(() => {
       <p>暂无概览数据</p>
     </div>
 
-    <!-- ── 趋势图（SVG 面积折线图） ── -->
+    <!-- ── 趋势图（ECharts） ── -->
     <div class="section-card">
       <div class="section-card__header">
         <h2 class="section-card__title">调用趋势</h2>
-        <span class="section-card__hint">近30天概览数据</span>
-      </div>
-
-      <div v-if="trendChart" class="trend-chart-area">
-        <!-- 图例 -->
-        <div class="trend-legend">
-          <span class="trend-legend__item">
-            <span class="trend-legend__dot trend-legend__dot--blue" />
-            调用量
-          </span>
-          <span class="trend-legend__item">
-            <span class="trend-legend__dot trend-legend__dot--teal" />
-            Token 消耗
-          </span>
-        </div>
-
-        <div class="trend-chart-body">
-          <!-- Y 轴 -->
-          <div class="trend-y-axis">
-            <span v-for="tick in trendChart.yTicks.slice().reverse()" :key="tick">
-              {{ tick >= 10000 ? (tick / 1000).toFixed(0) + 'k' : tick.toLocaleString() }}
-            </span>
-          </div>
-
-          <!-- SVG 画布 -->
-          <div class="trend-svg-wrap">
-            <svg viewBox="0 0 900 220" preserveAspectRatio="none" class="trend-svg">
-              <defs>
-                <linearGradient id="trendGradBlue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25" />
-                  <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.02" />
-                </linearGradient>
-                <linearGradient id="trendGradTeal" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.25" />
-                  <stop offset="100%" stop-color="#14b8a6" stop-opacity="0.02" />
-                </linearGradient>
-              </defs>
-              <!-- 网格线 -->
-              <line
-                v-for="(gy, gi) in trendChart.gridYs"
-                :key="'g' + gi"
-                :x1="0" :y1="gy" :x2="900" :y2="gy"
-                stroke="#f1f5f9" stroke-width="1"
-              />
-              <!-- 面积 -->
-              <path :d="trendChart.requestArea" fill="url(#trendGradBlue)" />
-              <path :d="trendChart.tokenArea" fill="url(#trendGradTeal)" />
-              <!-- 折线 -->
-              <polyline
-                :points="trendChart.requestPoints"
-                fill="none" stroke="#3b82f6" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"
-              />
-              <polyline
-                :points="trendChart.tokenPoints"
-                fill="none" stroke="#14b8a6" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round"
-              />
-              <!-- 末端圆点 -->
-              <circle
-                :cx="trendChart.lastX" :cy="trendChart.lastYRequest" r="4"
-                fill="#fff" stroke="#3b82f6" stroke-width="2.5"
-              />
-              <circle
-                :cx="trendChart.lastX" :cy="trendChart.lastYToken" r="4"
-                fill="#fff" stroke="#14b8a6" stroke-width="2.5"
-              />
-            </svg>
-            <!-- X 轴标签 -->
-            <div class="trend-x-labels">
-              <span
-                v-for="(xl, xi) in trendChart.xLabels"
-                :key="xi"
-                :style="{ left: (xl.x / 900) * 100 + '%' }"
-              >{{ xl.label }}</span>
-            </div>
-          </div>
+        <div class="period-tabs">
+          <button
+            v-for="opt in periodOptions"
+            :key="opt.value"
+            class="period-tab"
+            :class="{ active: selectedPeriod === opt.value }"
+            @click="selectedPeriod = opt.value"
+          >
+            {{ opt.label }}
+          </button>
         </div>
       </div>
-      <div v-else-if="!loadingOverview" class="empty-state">
-        <p>暂无趋势数据</p>
+
+      <div v-loading="loadingTrend" class="trend-chart-container">
+        <div v-if="hasTrendData" ref="trendChartRef" class="trend-chart-body" />
+        <div v-else-if="!loadingTrend" class="empty-state">
+          <p>暂无趋势数据</p>
+        </div>
       </div>
     </div>
 
@@ -413,52 +494,40 @@ onMounted(() => {
           <h2 class="section-card__title">用户排行</h2>
         </div>
 
-        <div class="period-tabs">
-          <button
-            v-for="opt in periodOptions"
-            :key="opt.value"
-            class="period-tab"
-            :class="{ active: selectedPeriod === opt.value }"
-            @click="selectedPeriod = opt.value"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
-
-        <div v-if="loadingRank" class="loading-inline">
-          <span>加载中...</span>
-        </div>
-        <table v-else-if="userRank.length > 0" class="rank-table">
-          <thead>
-            <tr>
-              <th class="rank-num-col">#</th>
-              <th>用户</th>
-              <th class="num-col">调用次数</th>
-              <th class="num-col">Token</th>
-              <th class="num-col">费用</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) in userRank" :key="item.id">
-              <td class="rank-num-col">
-                <span class="rank-badge" :class="getRankBadgeClass(idx)">{{ idx + 1 }}</span>
-              </td>
-              <td class="name-col">
-                <div class="user-chip">
-                  <span class="user-chip__avatar" :style="{ background: getAvatarColor(idx) }">
-                    {{ getInitial(item.name) }}
-                  </span>
-                  <span class="user-chip__name">{{ item.name }}</span>
-                </div>
-              </td>
-              <td class="num-col">{{ formatNumber(item.totalRequests) }}</td>
-              <td class="num-col">{{ formatNumber(item.totalTokens) }}</td>
-              <td class="num-col num-col--cost">{{ formatCost(item.totalCost) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="empty-state">
-          <p>暂无用户排行数据</p>
+        <div v-loading="loadingRank" class="rank-content">
+          <div v-if="userRank.length > 0" ref="userRankChartRef" class="rank-chart-body" />
+          <table v-if="userRank.length > 0" class="rank-table">
+            <thead>
+              <tr>
+                <th class="rank-num-col">#</th>
+                <th>用户</th>
+                <th class="num-col">调用次数</th>
+                <th class="num-col">Token</th>
+                <th class="num-col">费用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in userRank" :key="item.id">
+                <td class="rank-num-col">
+                  <span class="rank-badge" :class="getRankBadgeClass(idx)">{{ idx + 1 }}</span>
+                </td>
+                <td class="name-col">
+                  <div class="user-chip">
+                    <span class="user-chip__avatar" :style="{ background: getAvatarColor(idx) }">
+                      {{ getInitial(item.name) }}
+                    </span>
+                    <span class="user-chip__name">{{ item.name || '未知' }}</span>
+                  </div>
+                </td>
+                <td class="num-col">{{ formatNumber(item.totalRequests) }}</td>
+                <td class="num-col">{{ formatNumber(item.totalTokens) }}</td>
+                <td class="num-col num-col--cost">{{ formatCost(item.totalCost) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else-if="!loadingRank" class="empty-state">
+            <p>暂无用户排行数据</p>
+          </div>
         </div>
       </div>
 
@@ -468,45 +537,33 @@ onMounted(() => {
           <h2 class="section-card__title">群组排行</h2>
         </div>
 
-        <div class="period-tabs">
-          <button
-            v-for="opt in periodOptions"
-            :key="opt.value"
-            class="period-tab"
-            :class="{ active: selectedPeriod === opt.value }"
-            @click="selectedPeriod = opt.value"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
-
-        <div v-if="loadingRank" class="loading-inline">
-          <span>加载中...</span>
-        </div>
-        <table v-else-if="groupRank.length > 0" class="rank-table">
-          <thead>
-            <tr>
-              <th class="rank-num-col">#</th>
-              <th>群组</th>
-              <th class="num-col">调用次数</th>
-              <th class="num-col">Token</th>
-              <th class="num-col">费用</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, idx) in groupRank" :key="item.id">
-              <td class="rank-num-col">
-                <span class="rank-badge" :class="getRankBadgeClass(idx)">{{ idx + 1 }}</span>
-              </td>
-              <td class="name-col">{{ item.name }}</td>
-              <td class="num-col">{{ formatNumber(item.totalRequests) }}</td>
-              <td class="num-col">{{ formatNumber(item.totalTokens) }}</td>
-              <td class="num-col num-col--cost">{{ formatCost(item.totalCost) }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="empty-state">
-          <p>暂无群组排行数据</p>
+        <div v-loading="loadingRank" class="rank-content">
+          <div v-if="groupRank.length > 0" ref="groupRankChartRef" class="rank-chart-body" />
+          <table v-if="groupRank.length > 0" class="rank-table">
+            <thead>
+              <tr>
+                <th class="rank-num-col">#</th>
+                <th>群组</th>
+                <th class="num-col">调用次数</th>
+                <th class="num-col">Token</th>
+                <th class="num-col">费用</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in groupRank" :key="item.id">
+                <td class="rank-num-col">
+                  <span class="rank-badge" :class="getRankBadgeClass(idx)">{{ idx + 1 }}</span>
+                </td>
+                <td class="name-col">{{ item.name || '未知' }}</td>
+                <td class="num-col">{{ formatNumber(item.totalRequests) }}</td>
+                <td class="num-col">{{ formatNumber(item.totalTokens) }}</td>
+                <td class="num-col num-col--cost">{{ formatCost(item.totalCost) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else-if="!loadingRank" class="empty-state">
+            <p>暂无群组排行数据</p>
+          </div>
         </div>
       </div>
     </div>
@@ -684,7 +741,7 @@ onMounted(() => {
 }
 .section-card__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
 }
@@ -692,89 +749,26 @@ onMounted(() => {
   font-size: 17px;
   font-weight: 700;
   color: var(--text-primary);
+  margin: 0;
 }
 .section-card__hint {
   font-size: 13px;
   color: var(--text-muted);
 }
 
-/* ── 趋势图表（SVG 面积折线图） ── */
-.trend-chart-area {
-  display: flex;
-  flex-direction: column;
+/* ── 趋势图容器 ── */
+.trend-chart-container {
+  min-height: 320px;
 }
-
-.trend-legend {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 16px;
-}
-.trend-legend__item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-.trend-legend__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-.trend-legend__dot--blue {
-  background: #3b82f6;
-}
-.trend-legend__dot--teal {
-  background: #14b8a6;
-}
-
 .trend-chart-body {
-  display: flex;
-  gap: 12px;
-}
-
-.trend-y-axis {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding-bottom: 22px;
-  min-width: 40px;
-  text-align: right;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.trend-svg-wrap {
-  flex: 1;
-  position: relative;
-}
-.trend-svg {
   width: 100%;
-  height: 220px;
-  display: block;
-}
-
-.trend-x-labels {
-  display: flex;
-  justify-content: space-between;
-  position: relative;
-  margin-top: 6px;
-  font-size: 10px;
-  color: var(--text-muted);
-  padding: 0 2px;
-}
-.trend-x-labels span {
-  position: absolute;
-  transform: translateX(-50%);
-  white-space: nowrap;
+  height: 320px;
 }
 
 /* ── 时间段选择器（分段胶囊） ── */
 .period-tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 20px;
   background: #f1f5f9;
   border-radius: 10px;
   padding: 4px;
@@ -806,6 +800,16 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
+}
+
+.rank-content {
+  min-height: 200px;
+}
+
+.rank-chart-body {
+  width: 100%;
+  height: 200px;
+  margin-bottom: 16px;
 }
 
 /* ── 排行表格 ── */
@@ -921,14 +925,6 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* ── 加载中 ── */
-.loading-inline {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
 /* ── 响应式 ── */
 @media (max-width: 1024px) {
   .kpi-grid {
@@ -952,8 +948,8 @@ onMounted(() => {
   .kpi-card__value {
     font-size: 24px;
   }
-  .trend-svg {
-    height: 160px;
+  .trend-chart-body {
+    height: 240px;
   }
   .section-card {
     padding: 20px 18px;

@@ -122,18 +122,18 @@ watch(
 
     <div v-loading="loading" class="trace-dialog__canvas">
       <GraphCanvas
-        v-if="graph && graph.nodes.length > 0"
         ref="canvasRef"
         :graph="graph"
         :minimap="false"
         :toolbar="false"
         @node-click="handleNodeClick"
       />
-      <el-empty
-        v-else-if="!loading"
-        :description="errorMessage || '知识图谱中未找到相关实体'"
-        :image-size="90"
-      />
+      <div v-if="!loading && (!graph || graph.nodes.length === 0)" class="trace-dialog__empty">
+        <el-empty
+          :description="errorMessage || '知识图谱中未找到相关实体'"
+          :image-size="90"
+        />
+      </div>
     </div>
 
     <template #footer>
@@ -166,7 +166,16 @@ watch(
 }
 
 .trace-dialog__canvas {
+  position: relative;
   height: 460px;
   border-radius: 14px;
+}
+
+.trace-dialog__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

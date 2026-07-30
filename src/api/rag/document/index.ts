@@ -4,6 +4,7 @@ import type {
   DocumentListQuery,
   DocumentPreview,
   InitDocumentUploadPayload,
+  TripleExtractionProgress,
   UploadChunkPayload,
   UploadInitResult,
   UploadStatusResult
@@ -14,6 +15,7 @@ export type {
   DocumentListQuery,
   DocumentPreview,
   InitDocumentUploadPayload,
+  TripleExtractionProgress,
   UploadChunkPayload,
   UploadInitResult,
   UploadStatusResult
@@ -140,6 +142,16 @@ export async function retryDocumentIngestion(
     method: 'post',
     params: { groupId }
   });
+}
+
+/**
+ * 查询文档的三元组抽取进度
+ */
+export async function fetchTripleExtractionProgress(
+  documentId: number
+): Promise<TripleExtractionProgress> {
+  const res = await request({ url: `/rag/documents/${documentId}/triple-progress`, method: 'get' });
+  return res.data as TripleExtractionProgress;
 }
 
 /**

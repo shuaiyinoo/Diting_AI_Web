@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageHeaderHero from '@/components/layout/PageHeaderHero.vue'
 import { useRagStore } from '@/store/modules/rag'
@@ -104,21 +104,26 @@ function handleSizeChange(newSize: number) {
   loadEntities()
 }
 
-watch(selectedGroupId, (newId) => {
-  appStore.setCurrentGroupId(newId)
+/** 用户通过下拉框切换群组时触发 */
+function handleGroupChange() {
+  appStore.setCurrentGroupId(selectedGroupId.value)
   selectedType.value = ''
   page.value = 1
-  if (newId !== null) {
+  if (selectedGroupId.value !== null) {
     loadTypes()
     loadEntities()
   }
-})
+}
 
 onMounted(async () => {
   if (appStore.visibleGroups.length === 0) {
     await loadGroups()
-  } else if (selectedGroupId.value === null) {
-    selectedGroupId.value = appStore.visibleGroups[0]?.groupId ?? null
+  }
+  if (
+    selectedGroupId.value === null ||
+    !appStore.visibleGroups.some((g) => g.groupId === selectedGroupId.value)
+  ) {
+    selectedGroupId.value = appStore.currentGroupId ?? appStore.visibleGroups[0]?.groupId ?? null
   }
   if (selectedGroupId.value !== null) {
     loadTypes()
@@ -141,6 +146,7 @@ onMounted(async () => {
         :loading="groupsLoading"
         placeholder="选择知识库群组"
         class="entity-list__group-select"
+        @change="handleGroupChange"
       >
         <el-option
           v-for="group in appStore.visibleGroups"

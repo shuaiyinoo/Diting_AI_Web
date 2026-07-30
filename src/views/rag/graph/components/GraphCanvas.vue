@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { TopologyGraph, Minimap, GraphToolbar } from 'topology-graph-vue'
 import 'topology-graph-vue/style.css'
 import type { GraphVisualization } from '@/api/rag/graph'
@@ -63,6 +63,17 @@ function toCanvasData(vis: GraphVisualization) {
   // 收集所有节点 ID，用于过滤引用了不存在节点的边
   const nodeIds = new Set(vis.nodes.map((n) => n.id))
 
+  // 按 source + target + relation 去重，保留置信度最高的边
+  const edgeMap = new Map<string, GraphVisualization['edges'][number]>()
+  for (const edge of vis.edges) {
+    if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) continue
+    const key = `${edge.source}|${edge.target}|${edge.relation}`
+    const existing = edgeMap.get(key)
+    if (!existing || edge.confidence > existing.confidence) {
+      edgeMap.set(key, edge)
+    }
+  }
+
   return {
     nodes: vis.nodes.map((node) => {
       const matched = node.category === 'matched'
@@ -74,22 +85,22 @@ function toCanvasData(vis: GraphVisualization) {
         radius,
         borderColor: matched ? MATCHED_BORDER : 'rgba(255,255,255,0.9)',
         borderWidth: matched ? 3 : 1.5,
+        forceDetail: true,
         data: node
       }
     }),
-    lines: vis.edges
-      .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
-      .map((edge, index) => ({
-        id: `${edge.source}->${edge.target}:${edge.relation}:${index}`,
-        from: edge.source,
-        to: edge.target,
-        text: edge.relation,
-        color: EDGE_COLOR,
-        fontColor: '#7d8ca3',
-        showEndArrow: true,
-        curve: 'bezier',
-        data: edge
-      }))
+    lines: [...edgeMap.values()].map((edge) => ({
+      id: `${edge.source}->${edge.target}:${edge.relation}`,
+      from: edge.source,
+      to: edge.target,
+      text: edge.relation,
+      color: EDGE_COLOR,
+      fontColor: '#7d8ca3',
+      showEndArrow: true,
+      curve: 'bezier',
+      forceDetail: true,
+      data: edge
+    }))
   }
 }
 
@@ -130,9 +141,25 @@ function onReady(api: any) {
     hoverNodeLineHighlight: true,
     clickNodeHighlight: true,
     clickNodeLineHighlight: true,
-    perfConfig: { nodeTextMinScale: 0.35, lineTextMinScale: 0.45, hoverColorMinScale: 0.2 }
+    // 自定义 LOD 阶梯表：所有缩放级别均使用 detail 模式，确保连线+文字始终完整渲染
+    lodTiers: [
+      {
+        minScale: 0,
+        nodeMode: 'detail' as const,
+        lineMode: 'detail' as const,
+        nodeDowngradeThreshold: 100000,
+        lineDowngradeThreshold: 100000
+      }
+    ],
+    // 文字标签在所有缩放级别下显示
+    perfConfig: { nodeTextMinScale: 0, lineTextMinScale: 0, hoverColorMinScale: 0 }
   })
-  renderGraph(props.graph)
+  // 等待 DOM 更新完成，确保 PixiJS 画布已获得正确的容器尺寸后再渲染数据
+  nextTick(() => {
+    if (!destroyed.value) {
+      renderGraph(props.graph)
+    }
+  })
   emit('ready')
 }
 
