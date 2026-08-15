@@ -1,16 +1,10 @@
 <template>
   <div class="sidebar-logo-container" :class="{ collapse: collapse }">
     <transition :enter-active-class="animateConfig.logoAnimate.enter" mode="out-in">
-      <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 v-else class="sidebar-title">
-          {{ title }}
-        </h1>
-      </router-link>
-      <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 class="sidebar-title">
-          {{ title }}
+      <router-link key="logo" class="sidebar-logo-link" to="/">
+        <img v-if="logo" :src="logo" class="sidebar-logo" alt="谛听 Diting AI RAG" />
+        <h1 v-if="!collapse" class="sidebar-title">
+          谛听 <span class="title-en">Diting AI RAG</span>
         </h1>
       </router-link>
     </transition>
@@ -30,13 +24,10 @@ defineProps({
   }
 });
 
-const title = import.meta.env.VITE_APP_LOGO_TITLE;
 const settingsStore = useSettingsStore();
 const sideTheme = computed(() => settingsStore.sideTheme);
 const isTopNav = computed(() => settingsStore.navType === NavTypeEnum.TOP);
 const isDarkSide = computed(() => !isTopNav.value && sideTheme.value === 'theme-dark');
-const logoSurface = computed(() => (isDarkSide.value ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc'));
-const logoBorder = computed(() => (isDarkSide.value ? 'rgba(148, 163, 184, 0.12)' : '#e5e7eb'));
 const logoTextColor = computed(() => (isDarkSide.value ? '#f8fbff' : 'var(--app-text-title)'));
 </script>
 
@@ -53,56 +44,75 @@ const logoTextColor = computed(() => (isDarkSide.value ? '#f8fbff' : 'var(--app-
 .sidebar-logo-container {
   position: relative;
   flex-shrink: 0;
-  height: 46px;
-  line-height: 46px;
-  padding: 0 8px;
-  margin-top: 8px;
+  width: 100%;
+  height: 40px;
+  line-height: 1;
+  margin-top: 2px;
   background: transparent;
-  text-align: center;
+  border: none;
   overflow: hidden;
   margin-bottom: 0;
 
   & .sidebar-logo-link {
     height: 100%;
     width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border-radius: 14px;
-    background: v-bind(logoSurface);
-    border: 1px solid v-bind(logoBorder);
+    display: block;
+    position: relative;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
 
     & .sidebar-logo {
-      width: 28px;
-      height: 28px;
-      vertical-align: middle;
-      margin-right: 0;
-      margin-left: 0;
-      border-radius: 10px;
+      position: absolute;
+      top: 50%;
+      left: 5px;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+      margin: 0;
+      border-radius: 2px;
       box-shadow: none;
     }
 
     & .sidebar-title {
-      display: inline-block;
+      position: absolute;
+      top: 50%;
+      left: 47px;
+      transform: translateY(-50%);
+      display: inline-flex;
+      align-items: center;
       margin: 0;
       color: v-bind(logoTextColor);
-      font-weight: 600;
+      font-weight: 700;
       line-height: 1;
-      font-size: 15px;
+      font-size: 16px;
       letter-spacing: 0.02em;
       font-family: 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', sans-serif;
-      vertical-align: middle;
+      white-space: nowrap;
+
+      & .title-en {
+        font-weight: 600;
+        font-size: 13px;
+        opacity: 0.85;
+        margin-left: 4px;
+      }
     }
   }
 
+  /* 收缩状态：仅图标，水平垂直居中于顶部 */
   &.collapse {
     .sidebar-logo-link {
-      padding: 0;
+      position: relative;
     }
 
     .sidebar-logo {
-      margin-right: 0;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
     }
   }
 }
